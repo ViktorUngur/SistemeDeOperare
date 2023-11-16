@@ -54,7 +54,6 @@ void getImageWidthAndHeight(int fileDescriptor, int* width, int* height)
 
 void formatTime(struct timespec initialRepresentation, char* timeString)
 {
-    //char* timeString = (char*)malloc(sizeof(char)*TIME_STRING_SIZE);
     //seconds since epoch
     time_t seconds = initialRepresentation.tv_sec;
 
