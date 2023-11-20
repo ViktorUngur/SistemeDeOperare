@@ -1,0 +1,7 @@
+nume fisier: linkToTxtFile.txt
+dimensiune legatura: 10
+dimensiune fisier: 205
+drepturi de acces user: RWX
+drepturi de acces grup: RWX
+drepturi de acces altii: RWX
+

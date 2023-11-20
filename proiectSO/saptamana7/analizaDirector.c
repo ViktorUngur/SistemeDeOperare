@@ -245,24 +245,17 @@ void formatDirectoryOutput(char* stringToFormat, char* inputPath, struct stat in
                              strtok(NULL, "/"), info.st_uid, formatAccessRightsUser(info.st_mode), formatAccessRightsGroup(info.st_mode), formatAccessRightsOthers(info.st_mode));
 }
 
-int createFile(char* path, int mode, mode_t permissions)
-{
-    int outputFileDescriptor = open(path, mode, permissions);
-    if(outputFileDescriptor == -1)
-    {
-        printf("Error while creating file\n");
-        exit(-1);
-    }
-
-    return outputFileDescriptor;
-}
-
 void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath)
 {
     struct dirent* direntStruct;
     char* newPath = (char*)malloc(sizeof(char) * FILE_STRING_SIZE);
     
     int outputFileDescriptor = open("statistica.txt", O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if(outputFileDescriptor == -1)
+    {
+        printf("Error with creating the file\n");
+        exit(-1);
+    }
 
     while((direntStruct = readdir(inputDirectory)) != NULL)
     {
@@ -273,7 +266,7 @@ void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath)
             if(!lstat(newPath, &fileInfo))
             {
                 char* formattedString = (char*)malloc(sizeof(char)*FORMATTED_STRING_SIZE);
-                if(S_ISREG(fileInfo.st_mode))
+                if(S_ISREG(fileInfo.st_mode)) //formattedString ar trebui facut de fiecare data, tot asa si crearea de fisier si scrierea in el, waitul la sfarsit
                 {
                     if(isImageBMP(newPath))
                     {
@@ -304,6 +297,7 @@ void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath)
                 {
                     printf("Content was written to the file\n");
                 }
+
                 free(formattedString);
             }
             else
