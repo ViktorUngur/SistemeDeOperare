@@ -11,7 +11,9 @@
 
 
 #define SIZE_PATH 100
-#define OFFSET 18
+#define OFFSET_WIDTH 18
+#define OFFSET_RGB 54
+#define RDWR_BUFFER 4096
 #define HEIGHT_FIELD_SIZE 4
 #define WIDTH_FIELD_SIZE 4
 #define FORMATTED_STRING_SIZE 500
@@ -19,7 +21,6 @@
 #define RIGHTS_STRING_SIZE 4
 #define WRITE_BUFFER 100
 #define FILE_STRING_SIZE 50
-#define MAX_PIDS 4
 
 int isImageBMP(char* fileName)
 {
@@ -57,7 +58,7 @@ void checkDirectory(char* path)
 
 void getImageWidthAndHeight(int fileDescriptor, int* width, int* height) 
 {
-    if(lseek(fileDescriptor, OFFSET, SEEK_SET) == -1)
+    if(lseek(fileDescriptor, OFFSET_WIDTH, SEEK_SET) == -1)
     {
         printf("Error when setting the cursor\n");
         exit(-1);
@@ -173,6 +174,18 @@ int writeFile(int fileDescriptor, char* content)
 {
     ssize_t writtenBytes = 0;
     size_t remainingBytes = strlen(content);
+    int totalSize = strlen(content);
+    int countLines = 0;
+
+    for(int i = 0; i<totalSize; i++)
+    {
+        if(content[i] == '\n')
+        {
+            countLines++;
+        }
+    }
+
+    countLines = countLines - 1;
 
     while (remainingBytes > 0) {
         int bytesToWrite = (remainingBytes > WRITE_BUFFER) ? WRITE_BUFFER : remainingBytes;
@@ -187,8 +200,12 @@ int writeFile(int fileDescriptor, char* content)
         content += writtenBytes;
     }
 
+    
     if(!remainingBytes)
-        return 1;
+    {
+        //printf("in write %d\n", countLines);
+        return countLines;
+    }
     
     return 0;
 }
@@ -276,9 +293,10 @@ int createFile(char* outputDirectoryPath, char* fileName)
     return fileDescriptor;
 }
 
-int createWriteProcess(char* outputDirectoryPath, char* fileName, char* content)
+void createWriteProcess(char* outputDirectoryPath, char* fileName, char* content)
 {
     int pid = fork();
+    int totalLines = 0;
     if(pid < 0)
     {
         printf("Error with process\n");
@@ -288,14 +306,95 @@ int createWriteProcess(char* outputDirectoryPath, char* fileName, char* content)
     {
         int outputFileDescriptor = createFile(outputDirectoryPath, fileName);
 
-        
-        if(writeFile(outputFileDescriptor, content))
-        {
-            printf("Content was written to the file\n");
-            // print the lines written!!
-        }
+        totalLines = writeFile(outputFileDescriptor, content);
 
         closeFile(outputFileDescriptor);
+        exit(totalLines);
+    }
+}
+
+void readImagePixels(unsigned char* buffer, int fileSize, int fileDescriptor)
+{
+    ssize_t readBytes = 0;
+    size_t remainingBytes = fileSize;
+    unsigned char* currentBufferPos = buffer;
+
+    if(lseek(fileDescriptor, OFFSET_RGB, SEEK_SET) == -1)
+    {
+        printf("Error while setting the cursor\n");
+        exit(-1);
+    }
+
+     while(remainingBytes > 0)
+    {
+        int bytesToRead = (remainingBytes < RDWR_BUFFER) ? remainingBytes : RDWR_BUFFER;
+
+        if((readBytes = read(fileDescriptor, currentBufferPos, bytesToRead)) == -1)
+        {
+            printf("Error while reading\n");
+            exit(-1);
+        }
+
+        currentBufferPos += readBytes;
+        remainingBytes -= readBytes;
+    }
+}
+
+void writeImagePixels(unsigned char* buffer, int fileSize, int fileDescriptor)
+{
+    ssize_t writtenBytes = 0;
+    size_t remainingBytes = fileSize;
+    unsigned char* currentBufferPos = buffer;
+
+    if(lseek(fileDescriptor, OFFSET_RGB, SEEK_SET) == -1)
+    {
+        printf("Error while setting the cursor\n");
+        exit(-1);
+    }
+
+    while(remainingBytes > 0)
+    {
+        int bytesToWrite = (remainingBytes < RDWR_BUFFER) ? remainingBytes : RDWR_BUFFER;
+
+        if((writtenBytes = write(fileDescriptor, currentBufferPos, bytesToWrite)) == -1)
+        {
+            printf("Error while writing\n");
+            exit(-1);
+        }
+
+        currentBufferPos += writtenBytes;
+        remainingBytes -= writtenBytes;
+    }
+}
+
+int createPhotoProcess(char* path, int heigth, int width)
+{
+    int pid = fork();
+    if(pid < 0)
+    {
+        printf("Error with process\n");
+        exit(-1);
+    }
+    else if(pid == 0)
+    {
+        int fileDescriptor = openFile(path, O_RDWR);
+
+        int fileSize = heigth*width*3;
+        unsigned char* buffer = (unsigned char*)malloc(fileSize);
+
+        readImagePixels(buffer, fileSize, fileDescriptor);
+
+
+        for (int i = 0; i < fileSize; i += 3) {
+            unsigned char grey = 0.299 * buffer[i + 2] + 0.587 * buffer[i + 1] + 0.114 * buffer[i];
+            buffer[i] = buffer[i + 1] = buffer[i + 2] = grey;
+        }
+
+        writeImagePixels(buffer, fileSize, fileDescriptor);
+
+        free(buffer);
+        closeFile(fileDescriptor);
+
         exit(0);
     }
     else
@@ -309,8 +408,8 @@ void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath, char* output
     struct dirent* direntStruct;
     char* newPath = (char*)malloc(sizeof(char) * FILE_STRING_SIZE);
 
-    int childProcessPids[MAX_PIDS];
     int childPidCount = 0;
+    int photoPid = 0;
 
     while((direntStruct = readdir(inputDirectory)) != NULL)
     {
@@ -334,25 +433,35 @@ void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath, char* output
 
                         formatImageOutput(formattedString, direntStruct->d_name, imageWidth, imageHeight, fileInfo);  
                         
-                        childProcessPids[childPidCount++] = createWriteProcess(outputDirectoryPath, direntStruct->d_name, formattedString); 
+                        createWriteProcess(outputDirectoryPath, direntStruct->d_name, formattedString);
+
+                        photoPid = createPhotoProcess(newPath, imageHeight, imageWidth);
+                        
+                        childPidCount+=2;
                     }
                     else
                     {
                         formatRegularFileOutput(formattedString, direntStruct->d_name, fileInfo);
-                        childProcessPids[childPidCount++] = createWriteProcess(outputDirectoryPath, direntStruct->d_name, formattedString);    
+                        
+                        createWriteProcess(outputDirectoryPath, direntStruct->d_name, formattedString);
+                        childPidCount++;    
                     }
                 }
 
                 if(S_ISLNK(fileInfo.st_mode))
                 {
                     formatSymbolicLinkOutput(formattedString, newPath, direntStruct->d_name, fileInfo);
-                    childProcessPids[childPidCount++] = createWriteProcess(outputDirectoryPath, direntStruct->d_name, formattedString);
+                    
+                    createWriteProcess(outputDirectoryPath, direntStruct->d_name, formattedString);
+                    childPidCount++;
                 }
 
                 if(S_ISDIR(fileInfo.st_mode))
                 {
                     formatDirectoryOutput(formattedString, direntStruct->d_name, fileInfo);
-                    childProcessPids[childPidCount++] = createWriteProcess(outputDirectoryPath, direntStruct->d_name, formattedString);
+                    
+                    createWriteProcess(outputDirectoryPath, direntStruct->d_name, formattedString);
+                    childPidCount++;
                 }
 
                 free(formattedString);
@@ -368,14 +477,22 @@ void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath, char* output
     for(int i = 0; i<childPidCount; i++)
     {
         int status;
-        int pidDone = waitpid(childProcessPids[i], &status, WUNTRACED | WCONTINUED);
+        int pidDone = wait(&status);
         if(pidDone == -1)
         {
             printf("Error in wait function\n");
             exit(-1);
         }
 
-        if(WIFEXITED(status))
+        if(WIFEXITED(status) && WEXITSTATUS(status) > 0)
+        {
+            printf("Process with id %d exited with success, number of lines written: %d\n", pidDone, WEXITSTATUS(status));
+        }
+        else if(pidDone == photoPid && WIFEXITED(status))
+        {
+            printf("Process with id %d exited with status %d\n", pidDone, WEXITSTATUS(status));
+        }
+        else
         {
             printf("Process with id %d exited with status %d\n", pidDone, WEXITSTATUS(status));
         }
