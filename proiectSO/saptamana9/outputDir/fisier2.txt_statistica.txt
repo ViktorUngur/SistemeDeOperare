@@ -17,9 +17,9 @@ drepturi de acces grup: RW-
 drepturi de acces altii: R--
 
 nume fisier: fisier2.txt
-dimensiune: 102
+dimensiune: 104
 identificatorul utilizatorului: 1000
-timpul ultimei modificari: 27.11.2023
+timpul ultimei modificari: 29.11.2023
 contorul de legaturi: 1
 drepturi de acces user: RW-
 drepturi de acces grup: RW-
@@ -28,7 +28,7 @@ drepturi de acces altii: R--
 nume fisier: fisier2.txt
 dimensiune: 102
 identificatorul utilizatorului: 1000
-timpul ultimei modificari: 27.11.2023
+timpul ultimei modificari: 29.11.2023
 contorul de legaturi: 1
 drepturi de acces user: RW-
 drepturi de acces grup: RW-
@@ -37,7 +37,7 @@ drepturi de acces altii: R--
 nume fisier: fisier2.txt
 dimensiune: 102
 identificatorul utilizatorului: 1000
-timpul ultimei modificari: 27.11.2023
+timpul ultimei modificari: 29.11.2023
 contorul de legaturi: 1
 drepturi de acces user: RW-
 drepturi de acces grup: RW-
@@ -46,25 +46,16 @@ drepturi de acces altii: R--
 nume fisier: fisier2.txt
 dimensiune: 102
 identificatorul utilizatorului: 1000
-timpul ultimei modificari: 27.11.2023
+timpul ultimei modificari: 29.11.2023
 contorul de legaturi: 1
 drepturi de acces user: RW-
 drepturi de acces grup: RW-
 drepturi de acces altii: R--
 
 nume fisier: fisier2.txt
-dimensiune: 102
+dimensiune: 104
 identificatorul utilizatorului: 1000
-timpul ultimei modificari: 27.11.2023
-contorul de legaturi: 1
-drepturi de acces user: RW-
-drepturi de acces grup: RW-
-drepturi de acces altii: R--
-
-nume fisier: fisier2.txt
-dimensiune: 102
-identificatorul utilizatorului: 1000
-timpul ultimei modificari: 27.11.2023
+timpul ultimei modificari: 29.11.2023
 contorul de legaturi: 1
 drepturi de acces user: RW-
 drepturi de acces grup: RW-

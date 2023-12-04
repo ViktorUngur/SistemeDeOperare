@@ -14,6 +14,9 @@
 #define SIZE_PATH 100
 #define OFFSET_WIDTH 18
 #define OFFSET_RGB 54
+#define OFFSET_DATA 10
+#define OFFSET_BITCOUNT 28
+#define OFFSET_COLORS_USED 46
 #define RDWR_BUFFER 4096
 #define HEIGHT_FIELD_SIZE 4
 #define WIDTH_FIELD_SIZE 4
@@ -23,6 +26,7 @@
 #define WRITE_BUFFER 100
 #define FILE_STRING_SIZE 50
 #define INPUT_CHAR_SIZE 2
+#define OUTPUT_VALID 2
 
 int isImageBMP(char* fileName)
 {
@@ -369,6 +373,48 @@ void writeImagePixels(unsigned char* buffer, int fileSize, int fileDescriptor)
     }
 }
 
+void convert8BitToGrayScale(int fileDescriptor, int colorUsed, int imageDataOffset, int height, int width)
+{
+    unsigned char colorTable[colorUsed*4];
+    if(read(fileDescriptor, colorTable, colorUsed*4) == -1)
+    {
+        printf("Error while reading\n");
+        exit(-1);
+    }
+
+    unsigned char pixel;
+    int fileSize = height * width;
+
+    if(lseek(fileDescriptor, imageDataOffset, SEEK_SET) == -1)
+    {
+        printf("Error while setting the cursor\n");
+        exit(-1);
+    }
+
+    for(int i = 0; i<fileSize; i++)
+    {
+        if(read(fileDescriptor, &pixel, sizeof(unsigned char)) == -1)
+        {
+            printf("Error while reading\n");
+            exit(-1);
+        }
+
+        unsigned char grey = (unsigned char)((colorTable[pixel * 4] * 0.299 + colorTable[pixel * 4 + 1] * 0.587 + colorTable[pixel * 4 + 2]) * 0.114);
+                                              
+        if(lseek(fileDescriptor, -1, SEEK_CUR) == -1)
+        {
+            printf("Error while setting the cursor\n");
+            exit(-1);
+        }
+
+        if(write(fileDescriptor, &grey, sizeof(unsigned char)) == -1)
+        {
+            printf("Error while writting\n");
+            exit(-1);
+        }                      
+    }
+}
+
 int createPhotoProcess(char* path, int heigth, int width)
 {
     int pid = fork();
@@ -381,20 +427,64 @@ int createPhotoProcess(char* path, int heigth, int width)
     {
         int fileDescriptor = openFile(path, O_RDWR);
 
-        int fileSize = heigth*width*3;
-        unsigned char* buffer = (unsigned char*)malloc(fileSize);
-
-        readImagePixels(buffer, fileSize, fileDescriptor);
-
-
-        for (int i = 0; i < fileSize; i += 3) {
-            unsigned char grey = 0.299 * buffer[i + 2] + 0.587 * buffer[i + 1] + 0.114 * buffer[i];
-            buffer[i] = buffer[i + 1] = buffer[i + 2] = grey;
+        short int bitCount = 0;
+        if(lseek(fileDescriptor, OFFSET_BITCOUNT, SEEK_SET) == -1)
+        {
+            printf("Error while setting the cursor\n");
+            exit(-1);
+        }
+        if(read(fileDescriptor, &bitCount, 2) == -1)
+        {
+            printf("Error while reading\n");
+            exit(-1);
         }
 
-        writeImagePixels(buffer, fileSize, fileDescriptor);
+        if(bitCount <= 8)
+        {
+            int colorUsed = 0;
+            if(lseek(fileDescriptor, OFFSET_COLORS_USED, SEEK_SET) == -1)
+            {
+                printf("Error while setting the cursor\n");
+                exit(-1);
+            }
+            if(read(fileDescriptor, &colorUsed, 4) == -1)
+            {
+                printf("Error while reading\n");
+                exit(-1);
+            }
 
-        free(buffer);
+            int imageDataOffset = 0;
+            if(lseek(fileDescriptor, OFFSET_DATA, SEEK_SET) == -1)
+            {
+                printf("Error while setting the cursor\n");
+                exit(-1);
+            }
+            if(read(fileDescriptor, &imageDataOffset, 4) == -1)
+            {
+                printf("Error while reading\n");
+                exit(-1);
+            }
+
+            convert8BitToGrayScale(fileDescriptor, colorUsed, imageDataOffset, heigth, width);
+        }
+        else
+        {
+            int fileSize = heigth*width*3;
+            unsigned char* buffer = (unsigned char*)malloc(fileSize);
+
+            readImagePixels(buffer, fileSize, fileDescriptor);
+
+
+            for (int i = 0; i < fileSize; i += 3) {
+                unsigned char grey = 0.299 * buffer[i + 2] + 0.587 * buffer[i + 1] + 0.114 * buffer[i];
+                buffer[i] = buffer[i + 1] = buffer[i + 2] = grey;
+            }
+
+            writeImagePixels(buffer, fileSize, fileDescriptor);
+
+            free(buffer);
+        }
+
         closeFile(fileDescriptor);
 
         exit(0);
@@ -405,7 +495,7 @@ int createPhotoProcess(char* path, int heigth, int width)
     }
 }
 
-void createWriteRegularFileProcess(char* outputDirectoryPath, char* fileName, char* content, int* pfdBrothers, char* pathToFile)
+void createWriteRegularFileProcess(char* outputDirectoryPath, char* fileName, char* content, int* pfdBrothers, int* pfdLines, char* path)
 {
     int pid = fork();
     int totalLines = 0;
@@ -417,43 +507,42 @@ void createWriteRegularFileProcess(char* outputDirectoryPath, char* fileName, ch
     else if(pid == 0)
     {
         close(pfdBrothers[0]);
+        close(pfdLines[0]);
 
         int outputFileDescriptor = createFile(outputDirectoryPath, fileName);
 
         totalLines = writeFile(outputFileDescriptor, content);
+        write(pfdLines[1], &totalLines, 4);
 
         closeFile(outputFileDescriptor);
 
-        dup2(pfdBrothers[1], 1);  
-        close(pfdBrothers[1]);
-        
-        execlp("cat", "cat", pathToFile, NULL);
-        exit(totalLines);
+        dup2(pfdBrothers[1], 1);
+
+       execlp("cat", "cat", path, NULL);
+       printf("Error with cat exec\n");
+       exit(-1);
     }
 }
 
-int createCountValidSentenceProcess(int* pfdBrothers, int* pfdFatherChild, char* inputCharacter)
+int createCountValidSEntencesProcess(int* pfdBrothers, int* pfdParentChild, char* inputCharacter)
 {
     int pid = fork();
     if(pid < 0)
     {
-        printf("Error with process\n");
+        printf("Error with fork\n");
         exit(-1);
     }
     else if(pid == 0)
     {
-        close(pfdBrothers[1]);  
-        close(pfdFatherChild[0]); 
-        
-        
-        dup2(pfdBrothers[0], 0);  
-        dup2(pfdFatherChild[1], 1); 
-        
-        close(pfdBrothers[0]); 
-        close(pfdFatherChild[1]);
+        close(pfdBrothers[1]);
+        close(pfdParentChild[0]);
+
+        dup2(pfdBrothers[0], 0);
+        dup2(pfdParentChild[1], 1);
 
         execlp("/bin/bash", "bash", "script.sh", inputCharacter, NULL);
-        exit(-1);
+        printf("Error with script exec\n");
+       exit(-1);
     }
     else
     {
@@ -501,39 +590,45 @@ void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath, char* output
                     }
                     else
                     {
+                        int pfdBrothers[2];
+                        int pfdParentChild[2];
+                        int pfdLines[2];
+
                         formatRegularFileOutput(formattedString, direntStruct->d_name, fileInfo);
 
-                        int pfdFatherChild[2];
-                        int pfdBrothers[2];
-
-                        if(pipe(pfdBrothers) < 0)
+                        if(pipe(pfdBrothers) < 0 || pipe(pfdParentChild) < 0 || pipe(pfdLines) < 0)
                         {
-                            printf("Error with pipe\n");
-                            exit(-1);
-                        }
-
-                        if(pipe(pfdFatherChild) < 0)
-                        {
-                            printf("Error with pipe\n");
+                            printf("Error with pipe creation\n");
                             exit(-1);
                         }
                         
-                        createWriteRegularFileProcess(outputDirectoryPath, direntStruct->d_name, formattedString, pfdBrothers, newPath);
-                        validPid = createCountValidSentenceProcess(pfdBrothers, pfdFatherChild, inputCharacter);
+                        createWriteRegularFileProcess(outputDirectoryPath, direntStruct->d_name, formattedString, pfdBrothers, pfdLines, newPath);
                         
-                        close(pfdFatherChild[1]);
-                        char* countValid = (char*)malloc(sizeof(char)*30);
-                        
-                        read(pfdFatherChild[0], &countValid, 4);
-                        printf("%s\n", countValid);
+                        close(pfdBrothers[1]);
+                        close(pfdLines[1]);
 
-                        countCorrectSentence += 2;
-                        childPidCount+=2;
+                        validPid = createCountValidSEntencesProcess(pfdBrothers, pfdParentChild, inputCharacter);
 
-                        close(pfdFatherChild[0]);
-                        close(pfdFatherChild[1]);
                         close(pfdBrothers[0]);
-                        close(pfdBrothers[1]);    
+                        close(pfdParentChild[1]);
+                        close(pfdLines[1]);
+
+                        int totalLines = 0;
+                        read(pfdLines[0], &totalLines, 4);
+                        printf("Total lines written: %d\n", totalLines);
+
+                        close(pfdLines[0]);
+
+                        char* string = (char*)malloc(sizeof(char)*OUTPUT_VALID);
+                        read(pfdParentChild[0], string, OUTPUT_VALID);
+
+                        close(pfdParentChild[0]);
+                        
+                        int validForOneFile = atoi(string);
+                        countCorrectSentence += validForOneFile;
+
+                        childPidCount+=2;
+   
                     }
                 }
 
