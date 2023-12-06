@@ -373,19 +373,10 @@ void writeImagePixels(unsigned char* buffer, int fileSize, int fileDescriptor)
     }
 }
 
-void convert8BitToGrayScale(int fileDescriptor, int colorUsed, int imageDataOffset, int height, int width)
+void convert8BitToGrayScale(int fileDescriptor, int fileSize)
 {
-    unsigned char colorTable[colorUsed*4];
-    if(read(fileDescriptor, colorTable, colorUsed*4) == -1)
-    {
-        printf("Error while reading\n");
-        exit(-1);
-    }
-
-    unsigned char pixel;
-    int fileSize = height * width;
-
-    if(lseek(fileDescriptor, imageDataOffset, SEEK_SET) == -1)
+    unsigned char R, G, B;
+    if(lseek(fileDescriptor, OFFSET_RGB, SEEK_SET) == -1)
     {
         printf("Error while setting the cursor\n");
         exit(-1);
@@ -393,25 +384,31 @@ void convert8BitToGrayScale(int fileDescriptor, int colorUsed, int imageDataOffs
 
     for(int i = 0; i<fileSize; i++)
     {
-        if(read(fileDescriptor, &pixel, sizeof(unsigned char)) == -1)
+        if(read(fileDescriptor, &R, sizeof(unsigned char)) == -1 || read(fileDescriptor, &G, sizeof(unsigned char)) == -1 || read(fileDescriptor, &B, sizeof(unsigned char)) == -1)
         {
             printf("Error while reading\n");
             exit(-1);
         }
 
-        unsigned char grey = (unsigned char)((colorTable[pixel * 4] * 0.299 + colorTable[pixel * 4 + 1] * 0.587 + colorTable[pixel * 4 + 2]) * 0.114);
+        unsigned char grey = 0.299 * R + 0.587 * G + 0.114 * B;
                                               
-        if(lseek(fileDescriptor, -1, SEEK_CUR) == -1)
+        if(lseek(fileDescriptor, -3, SEEK_CUR) == -1)
         {
             printf("Error while setting the cursor\n");
             exit(-1);
         }
 
-        if(write(fileDescriptor, &grey, sizeof(unsigned char)) == -1)
+        if(write(fileDescriptor, &grey, sizeof(unsigned char)) == -1 || write(fileDescriptor, &grey, sizeof(unsigned char)) == -1 || write(fileDescriptor, &grey, sizeof(unsigned char)) == -1)
         {
             printf("Error while writting\n");
             exit(-1);
-        }                      
+        }
+
+        if(lseek(fileDescriptor, 1, SEEK_CUR) == -1)
+        {
+            printf("Error while setting the cursor\n");
+            exit(-1);
+        }
     }
 }
 
@@ -453,19 +450,7 @@ int createPhotoProcess(char* path, int heigth, int width)
                 exit(-1);
             }
 
-            int imageDataOffset = 0;
-            if(lseek(fileDescriptor, OFFSET_DATA, SEEK_SET) == -1)
-            {
-                printf("Error while setting the cursor\n");
-                exit(-1);
-            }
-            if(read(fileDescriptor, &imageDataOffset, 4) == -1)
-            {
-                printf("Error while reading\n");
-                exit(-1);
-            }
-
-            convert8BitToGrayScale(fileDescriptor, colorUsed, imageDataOffset, heigth, width);
+            convert8BitToGrayScale(fileDescriptor, colorUsed);
         }
         else
         {
