@@ -1,0 +1,33 @@
+nume fisier: imagine_3.bmp
+inaltime: 256
+lungime: 256
+dimensiune: 196666
+identificatorul utilizatorului: 1000
+timpul ultimei modificari: 09.12.2023
+contorul de legaturi: 1
+drepturi de acces user: RW-
+drepturi de acces grup: RW-
+drepturi de acces altii: R--
+
+nume fisier: imagine_3.bmp
+inaltime: 256
+lungime: 256
+dimensiune: 196666
+identificatorul utilizatorului: 1000
+timpul ultimei modificari: 09.12.2023
+contorul de legaturi: 1
+drepturi de acces user: RW-
+drepturi de acces grup: RW-
+drepturi de acces altii: R--
+
+nume fisier: imagine_3.bmp
+inaltime: 256
+lungime: 256
+dimensiune: 196666
+identificatorul utilizatorului: 1000
+timpul ultimei modificari: 09.12.2023
+contorul de legaturi: 1
+drepturi de acces user: RW-
+drepturi de acces grup: RW-
+drepturi de acces altii: R--
+

@@ -509,7 +509,7 @@ void createWriteRegularFileProcess(char* outputDirectoryPath, char* fileName, ch
     }
 }
 
-int createCountValidSEntencesProcess(int* pfdBrothers, int* pfdParentChild, char* inputCharacter)
+int createCountValidSentencesProcess(int* pfdBrothers, int* pfdParentChild, char* inputCharacter)
 {
     int pid = fork();
     if(pid < 0)
@@ -527,7 +527,7 @@ int createCountValidSEntencesProcess(int* pfdBrothers, int* pfdParentChild, char
 
         execlp("/bin/bash", "bash", "script.sh", inputCharacter, NULL);
         printf("Error with script exec\n");
-       exit(-1);
+        exit(-1);
     }
     else
     {
@@ -592,7 +592,7 @@ void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath, char* output
                         close(pfdBrothers[1]);
                         close(pfdLines[1]);
 
-                        validPid = createCountValidSEntencesProcess(pfdBrothers, pfdParentChild, inputCharacter);
+                        validPid = createCountValidSentencesProcess(pfdBrothers, pfdParentChild, inputCharacter);
 
                         close(pfdBrothers[0]);
                         close(pfdParentChild[1]);
@@ -613,6 +613,7 @@ void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath, char* output
                         countCorrectSentence += validForOneFile;
 
                         childPidCount+=2;
+                        free(string);
    
                     }
                 }
@@ -671,7 +672,7 @@ void readMyDirectory(DIR* inputDirectory, char* inputDirectoryPath, char* output
         }
     }
 
-    printf("Total valid sentences in text files: %d\n", countCorrectSentence);
+    printf("Total valid sentences that contain %s in text files: %d\n", inputCharacter, countCorrectSentence);
 }
 
 int main(int argc, char* argv[])
